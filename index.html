@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analisis Struk Cerdas (VLM)</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #1e293b;
+            --border: #e2e8f0;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            max-width: 600px;
+            width: 100%;
+            background: var(--card);
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        h1, h2, h3 { margin-top: 0; text-align: center; }
+        .form-group { margin-bottom: 16px; }
+        label { display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px; }
+        input[type="text"] {
+            width: 100%; padding: 10px; border: 1px solid var(--border);
+            border-radius: 6px; box-sizing: border-box; font-family: monospace;
+        }
+        .btn-group { display: flex; gap: 10px; margin-bottom: 16px; }
+        .btn {
+            flex: 1; padding: 12px; border: none; border-radius: 6px;
+            background-color: var(--primary); color: white; font-weight: bold;
+            cursor: pointer; transition: 0.2s; text-align: center; font-size: 14px;
+        }
+        .btn:hover { background-color: var(--primary-hover); }
+        .btn:disabled { background-color: #94a3b8; cursor: not-allowed; }
+        .btn-outline { background-color: white; color: var(--text); border: 1px solid var(--border); }
+        .btn-outline:hover { background-color: var(--bg); }
+        
+        #imagePreview {
+            width: 100%; max-height: 300px; object-fit: contain;
+            border: 2px dashed var(--border); border-radius: 8px;
+            display: none; margin-bottom: 16px; background: var(--bg);
+        }
+        
+        .result-box {
+            background: #f1f5f9; padding: 16px; border-radius: 8px;
+            border: 1px solid var(--border); white-space: pre-wrap; font-family: monospace;
+            margin-bottom: 24px; display: none;
+        }
+        
+        .criteria-box {
+            font-size: 13px; color: #475569; background: #fff8f1;
+            padding: 16px; border-radius: 8px; border: 1px solid #fed7aa;
+        }
+        .criteria-box ul { margin: 8px 0 0 0; padding-left: 20px; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Analisis Struk (VLM)</h1>
+    
+    <!-- 1. Konfigurasi Endpoint -->
+    <div class="form-group">
+        <label for="apiUrl">URL Endpoint Publik Ngrok (Full URL)</label>
+        <input type="text" id="apiUrl" placeholder="https://xxxx-xxx.ngrok-free.app/predict_struk">
+    </div>
+
+    <!-- 2. Pilihan Input Gambar -->
+    <div class="form-group">
+        <label>Pilih Sumber Gambar</label>
+        <div class="btn-group">
+            <button class="btn btn-outline" onclick="document.getElementById('fileUpload').click()">📁 Buka File</button>
+            <button class="btn btn-outline" onclick="document.getElementById('cameraCapture').click()">📸 Gunakan Kamera</button>
+        </div>
+        <!-- Hidden inputs -->
+        <input type="file" id="fileUpload" accept="image/*" class="hidden" onchange="previewImage(this)">
+        <input type="file" id="cameraCapture" accept="image/*" capture="environment" class="hidden" onchange="previewImage(this)">
+    </div>
+
+    <img id="imagePreview" alt="Pratinjau Struk">
+
+    <!-- 3. Tombol Analisis -->
+    <button id="analyzeBtn" class="btn" style="width: 100%; margin-bottom: 24px;" onclick="analyzeStruk()" disabled>🔍 Analisis Struk</button>
+
+    <!-- 4. Hasil Analisis -->
+    <div id="resultContainer" class="result-box"></div>
+
+    <!-- 5. Kriteria Kelengkapan -->
+    <div class="criteria-box">
+        <strong>📚 Kriteria Penilaian Kelengkapan Struk:</strong>
+        <ul>
+            <li>Terdapat informasi struk secara lengkap (5/5)</li>
+            <li>Informasi tersedia namun terbatas (4/5)</li>
+            <li>Informasi terkait struk hanya sebagian (3/5)</li>
+            <li>Tidak memiliki informasi lengkap (2/5)</li>
+            <li>Tidak memenuhi standar minimum (1/5)</li>
+            <li>Bukan struk (0/5)</li>
+        </ul>
+    </div>
+</div>
+
+<script>
+    let currentFile = null;
+
+    function previewImage(input) {
+        if (input.files && input.files[0]) {
+            currentFile = input.files[0];
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                const img = document.getElementById('imagePreview');
+                img.src = e.target.result;
+                img.style.display = 'block';
+                document.getElementById('analyzeBtn').disabled = false;
+            }
+            reader.readAsDataURL(currentFile);
+        }
+    }
+
+    async function analyzeStruk() {
+        const apiUrl = document.getElementById('apiUrl').value.trim();
+        if (!apiUrl) {
+            alert("Harap masukkan URL Endpoint Ngrok terlebih dahulu!");
+            return;
+        }
+        if (!currentFile) {
+            alert("Harap pilih gambar struk terlebih dahulu!");
+            return;
+        }
+
+        const btn = document.getElementById('analyzeBtn');
+        const resultContainer = document.getElementById('resultContainer');
+        
+        btn.disabled = true;
+        btn.innerText = "⏳ Sedang Menganalisis (Bisa memakan waktu di CPU)...";
+        resultContainer.style.display = "none";
+
+        const formData = new FormData();
+        formData.append("file", currentFile);
+
+        try {
+            const response = await fetch(apiUrl, {
+                method: "POST",
+                headers: {
+                    // Header wajib untuk bypass halaman peringatan ngrok saat diakses via fetch browser
+                    "ngrok-skip-browser-warning": "true" 
+                },
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP Error: ${response.status} - ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            
+            // Tampilkan hasil raw answer dari VLM
+            resultContainer.innerText = data.answer || "Model tidak mengembalikan jawaban.";
+            resultContainer.style.display = "block";
+            
+        } catch (error) {
+            alert("Gagal menghubungi server VLM: " + error.message);
+            console.error(error);
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "🔍 Analisis Struk";
+        }
+    }
+</script>
+
+</body>
+</html>
